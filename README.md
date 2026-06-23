@@ -50,40 +50,6 @@ python demos/text_generation.py --prompt "写一首关于夏天的短诗"
 将文本转换为向量，可用于语义搜索、聚类等。
 python demos/text_embedding.py --input "今天天气真好"
 
-
-输出示例：
-
-向量维度: 1536
-前10个元素: [0.012, -0.045, 0.078, ...]
-
-
-3. 图像描述（Image Captioning）
-
-上传一张图片，让 AI 生成文字描述（需使用多模态模型，如 GPT-4 Vision 或 Qwen-VL）。
-python demos/image_caption.py --image_path ./example.jpg
-
-
-4. 对话补全（Chat Completion）
-
-模拟多轮对话，展示上下文记忆功能。
-python demos/chat_completion.py
-
-
-运行示例
-
-以文本嵌入为例，完整运行流程：
-
-1. 设置环境变量：
-   export DASHSCOPE_API_KEY="sk-xxxx"
-   
-2. 运行 demo：
-   python demos/text_embedding.py --input "衣服的质量杠杠的"
-   
-3. 输出：
-
-   输入文本: 衣服的质量杠杠的
-   向量维度: 1024
-   向量前5个值: [0.032, -0.017, 0.065, -0.004, 0.091]
    
 
 注意事项
