@@ -1,0 +1,14 @@
+{
+  "embedding_model": "text-embedding-v4",
+  "embedding_dim": 1024,
+  "preprocess_mode": "rule",
+  "preprocess_suffix": ".preprocessed.json",
+  "index_type": "IndexFlatIP",
+  "similarity": "cosine",
+  "vector_count": 6,
+  "document_count": 1,
+  "source_files": [
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/浦发上海浦东发展银行西安分行个金客户经理考核办法.pdf"
+  ],
+  "created_at": "2026-06-25T16:49:41"
+}
