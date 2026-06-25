@@ -299,6 +299,74 @@ def build_user_message(query: str, context: str) -> str:
     )
 
 
+def serialize_hits(hits: Sequence[RetrievedHit]) -> List[dict]:
+    """将检索结果序列化为 JSON 可传输结构。"""
+    result: List[dict] = []
+    for hit in hits:
+        meta = hit.metadata
+        result.append(
+            {
+                "rank": hit.rank,
+                "vector_id": hit.vector_id,
+                "chunk_id": meta.get("chunk_id"),
+                "score": round(hit.score, 4),
+                "display_name": meta.get("display_name", ""),
+                "location": format_location(meta),
+                "summary": meta.get("summary", ""),
+                "preview": truncate_text(meta.get("text", ""), MAX_CHUNK_PREVIEW),
+            }
+        )
+    return result
+
+
+def generate_answer_sync(
+    client: OpenAI,
+    query: str,
+    context: str,
+    mode: str,
+    history: Sequence[ChatTurn],
+) -> str:
+    """非流式生成回答（供 Web API 使用）。"""
+    messages: List[dict] = [{"role": "system", "content": build_system_prompt(mode)}]
+    for turn in history[-MAX_HISTORY_TURNS:]:
+        messages.append({"role": turn.role, "content": turn.content})
+    messages.append({"role": "user", "content": build_user_message(query, context)})
+
+    response = client.chat.completions.create(
+        model=CHAT_MODEL,
+        messages=messages,
+        temperature=0,
+        extra_body={"enable_thinking": False},
+    )
+    return response.choices[0].message.content or ""
+
+
+def rag_query(
+    client: OpenAI,
+    index: faiss.Index,
+    metadata: List[dict],
+    session: RAGSession,
+    query: str,
+    top_k: int = RETRIEVE_TOP_K,
+) -> dict:
+    """执行一轮 RAG 并返回结构化结果（供 Web / API 调用）。"""
+    hits = search_index(client, index, metadata, query, top_k=top_k)
+    session.last_hits = hits
+    context = build_context_block(hits)
+    answer = generate_answer_sync(client, query, context, session.mode, session.history)
+
+    session.history.append(ChatTurn(role="user", content=query))
+    session.history.append(ChatTurn(role="assistant", content=answer))
+
+    return {
+        "mode": session.mode,
+        "mode_label": MODE_CONFIG[session.mode]["label"],
+        "query": query,
+        "hits": serialize_hits(hits),
+        "answer": answer,
+    }
+
+
 def generate_answer(
     client: OpenAI,
     query: str,
