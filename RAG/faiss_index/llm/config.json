@@ -5,10 +5,28 @@
   "preprocess_suffix": ".preprocessed.llm.json",
   "index_type": "IndexFlatIP",
   "similarity": "cosine",
-  "vector_count": 9,
-  "document_count": 1,
+  "vector_count": 325,
+  "document_count": 19,
   "source_files": [
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/1-2018ƒÍ4‘¬πÿ”⁄πÊ∑∂Ω»⁄ª˙ππ◊ ≤˙π‹¿Ì“µŒÒµƒ÷∏µº“‚º˚.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/1-2018ƒÍ7‘¬πÿ”⁄Ω¯“ª≤Ω√˜»∑πÊ∑∂Ω»⁄ª˙ππ◊ ≤˙π‹¿Ì“µŒÒ÷∏µº“‚º˚”–πÿ ¬œÓµƒÕ®÷™.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/N-2018ƒÍ12‘¬…Ã“µ“¯––¿Ì≤∆◊”π´Àæπ‹¿Ì∞Ï∑®.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/N-2018ƒÍ9‘¬…Ã“µ“¯––¿Ì≤∆“µŒÒº‡∂Ωπ‹¿Ì∞Ï∑®.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/N-2019ƒÍ11‘¬…Ã“µ“¯––¿Ì≤∆◊”π´Àææª◊ ±æπ‹¿Ì∞Ï∑®£® ‘––£©.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/N-2021ƒÍ12‘¬¿Ì≤∆π´Àæ¿Ì≤∆≤˙∆∑¡˜∂Ø–‘∑Áœ’π‹¿Ì∞Ï∑®.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/N-2022ƒÍ9‘¬¿Ì≤∆π´Àæƒ⁄≤øøÿ÷∆π‹¿Ì∞Ï∑®.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2018ƒÍ5‘¬“¯––“µΩ»⁄ª˙ππ ˝æ›÷Œ¿Ì÷∏“˝.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2020ƒÍ7‘¬±Í◊ºªØ’Æ»®¿‡◊ ≤˙»œ∂®πÊ‘Ú.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2021ƒÍ11‘¬“¯––±£œ’ª˙πππÿ¡™Ωª“◊π‹¿Ì∞Ï∑®.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2021ƒÍ6‘¬πÿ”⁄πÊ∑∂œ÷Ωπ‹¿Ì¿‡¿Ì≤∆≤˙∆∑π‹¿Ì”–πÿ ¬œÓµƒÕ®÷™.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2021ƒÍ6‘¬“¯––±£œ’ª˙πππ´Àæ÷Œ¿Ì◊º‘Ú.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2021ƒÍ9‘¬πÿ”⁄ø™’π—¯¿œ¿Ì≤∆≤˙∆∑ ‘µ„µƒÕ®÷™.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2022ƒÍ11‘¬πÿ”⁄”°∑¢…Ã“µ“¯––∫Õ¿Ì≤∆π´Àæ∏ˆ»À—¯¿œΩ“µŒÒπ‹¿Ì‘›––∞Ï∑®µƒÕ®÷™.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2022ƒÍ2‘¬÷–π˙“¯±£º‡ª·∞Ïπ´Ã¸πÿ”⁄¿©¥Û—¯¿œ¿Ì≤∆≤˙∆∑ ‘µ„∑∂ŒßµƒÕ®÷™.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2024ƒÍ12‘¬“¯––±£œ’ª˙ππ ˝æ›∞≤»´π‹¿Ì∞Ï∑®.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2025ƒÍ3‘¬π˙º“Ω»⁄º‡∂Ωπ‹¿Ì◊‹æ÷πÿ”⁄”°∑¢°∂…Ã“µ“¯––¥˙¿Ìœ˙ €“µŒÒπ‹¿Ì∞Ï∑®°∑µƒÕ®÷™.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2025ƒÍ4‘¬“¯––“µΩ»⁄ª˙ππ∂≠ ¬£®¿Ì ¬£©∫Õ∏ﬂº∂π‹¿Ì»À‘±»Œ÷∞◊ ∏Òπ‹¿Ì∞Ï∑®.pdf",
     "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/浦发上海浦东发展银行西安分行个金客户经理考核办法.pdf"
   ],
-  "created_at": "2026-06-25T16:57:06"
+  "created_at": "2026-06-25T17:45:53"
 }

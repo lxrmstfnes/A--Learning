@@ -2,3 +2,5 @@ openai>=1.0.0
 faiss-cpu>=1.7.4
 numpy>=1.24.0
 pypdf>=4.0.0
+duckduckgo-search>=6.0.0
+requests>=2.31.0

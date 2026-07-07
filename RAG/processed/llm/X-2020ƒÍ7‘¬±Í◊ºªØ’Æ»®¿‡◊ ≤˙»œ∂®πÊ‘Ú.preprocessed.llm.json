@@ -1,0 +1,38 @@
+{
+  "source_file": "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2020ƒÍ7‘¬±Í◊ºªØ’Æ»®¿‡◊ ≤˙»œ∂®πÊ‘Ú.pdf",
+  "preprocess_mode": "llm",
+  "chat_model": "deepseek-v4-pro",
+  "total_pages": 1,
+  "valid_pages": 1,
+  "empty_pages": [],
+  "error_pages": [],
+  "batch_count": 1,
+  "min_chunk_chars": 200,
+  "max_chunk_chars": 1200,
+  "chunk_count": 1,
+  "created_at": "2026-06-25T17:26:07",
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "首页",
+      "is_empty": false,
+      "error": null
+    }
+  ],
+  "chunks": [
+    {
+      "chunk_id": 0,
+      "text": "首页",
+      "source_pages": [
+        1
+      ],
+      "title": "",
+      "summary": "文档首页，无具体内容。",
+      "batch_index": 0,
+      "llm_source_pages": [
+        1
+      ],
+      "pages_corrected": false
+    }
+  ]
+}

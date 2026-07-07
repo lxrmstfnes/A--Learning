@@ -3,222 +3,520 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RAG 知识库问答</title>
+  <title>监管知识应知应会</title>
   <style>
     :root {
-      --bg: #f5f7fb;
-      --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #1e293b;
-      --muted: #64748b;
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
-      --hit-bg: #f8fafc;
-      --assistant-bg: #eff6ff;
+      --bg-top: #e3ecfb;
+      --bg-bottom: #ebe6f7;
+      --surface: rgba(255, 255, 255, 0.92);
+      --surface-solid: #ffffff;
+      --border: rgba(120, 130, 180, 0.18);
+      --text: #1a1a2e;
+      --text-secondary: #6b7280;
+      --accent: #6366f1;
+      --accent-soft: #eef2ff;
+      --user-bg: #f0f4ff;
+      --shadow: 0 4px 24px rgba(99, 102, 241, 0.08);
+      --shadow-input: 0 8px 30px rgba(80, 90, 160, 0.12);
+      --max-width: 768px;
+      --header-h: 56px;
     }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(165deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+      background-attachment: fixed;
       color: var(--text);
+      display: flex;
+      flex-direction: column;
       min-height: 100vh;
     }
-    .container {
-      max-width: 920px;
-      margin: 0 auto;
-      padding: 24px 16px 48px;
+
+    /* ===== 顶栏 ===== */
+    .topbar {
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
-    header {
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-text h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .brand-text p {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-top: 1px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mode-select {
+      appearance: none;
+      padding: 6px 28px 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-solid) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center;
+      font: inherit;
+      font-size: 0.8rem;
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+      max-width: 200px;
+    }
+
+    .mode-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+
+    .btn-text {
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .btn-text:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* ===== 主区域 ===== */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: var(--max-width);
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 16px;
+      min-height: 0;
+    }
+
+    .chat-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 0 16px;
+      scroll-behavior: smooth;
+    }
+
+    /* 空状态 */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - var(--header-h) - 160px);
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .empty-state.hidden { display: none; }
+
+    .empty-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15));
+      display: flex;
+      align-items: center;
+      justify-content: center;
       margin-bottom: 20px;
     }
-    header h1 {
+
+    .empty-icon svg {
+      width: 28px;
+      height: 28px;
+      stroke: var(--accent);
+    }
+
+    .empty-state h2 {
       font-size: 1.5rem;
       font-weight: 600;
-      margin-bottom: 6px;
-    }
-    header p {
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-    .toolbar {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .toolbar label {
-      font-size: 0.875rem;
-      color: var(--muted);
-    }
-    select, button, textarea {
-      font: inherit;
-    }
-    select {
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--card);
-    }
-    .btn {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.875rem;
-    }
-    .btn-primary {
-      background: var(--primary);
-      color: #fff;
-    }
-    .btn-primary:hover { background: var(--primary-hover); }
-    .btn-primary:disabled {
-      background: #94a3b8;
-      cursor: not-allowed;
-    }
-    .btn-ghost {
-      background: var(--card);
-      border: 1px solid var(--border);
+      margin-bottom: 8px;
       color: var(--text);
     }
-    .status {
-      font-size: 0.8rem;
-      color: var(--muted);
+
+    .empty-state p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      max-width: 360px;
     }
-    .status.error { color: #dc2626; }
-    .chat-box {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      min-height: 420px;
-      max-height: 65vh;
-      overflow-y: auto;
-      padding: 16px;
+
+    /* 消息 */
+    .turn {
+      margin-bottom: 32px;
+      animation: fadeIn 0.35s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg-row {
+      display: flex;
+      gap: 12px;
       margin-bottom: 16px;
     }
-    .empty-tip {
-      color: var(--muted);
-      text-align: center;
-      padding: 80px 20px;
-      font-size: 0.95rem;
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 600;
+      margin-top: 2px;
     }
-    .message { margin-bottom: 20px; }
-    .message-label {
-      font-size: 0.75rem;
-      color: var(--muted);
+
+    .avatar-user {
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      color: #fff;
+    }
+
+    .avatar-ai {
+      background: var(--surface-solid);
+      border: 1px solid var(--border);
+      color: var(--accent);
+    }
+
+    .msg-body { flex: 1; min-width: 0; }
+
+    .msg-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-secondary);
       margin-bottom: 6px;
-      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
-    .bubble {
-      padding: 12px 14px;
-      border-radius: 10px;
+
+    .msg-user-text {
+      font-size: 0.95rem;
       line-height: 1.65;
       white-space: pre-wrap;
       word-break: break-word;
+      color: var(--text);
     }
-    .bubble-user {
-      background: #f1f5f9;
+
+    .msg-ai-text {
+      font-size: 0.95rem;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text);
     }
-    .bubble-assistant {
-      background: var(--assistant-bg);
+
+    /* 检索来源 */
+    .sources {
+      margin: 4px 0 20px 40px;
     }
-    .hits-block {
-      margin: 10px 0 16px;
+
+    .sources-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 8px;
       border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    .hits-header {
-      background: var(--hit-bg);
-      padding: 10px 14px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--muted);
-      border-bottom: 1px solid var(--border);
-    }
-    .hit-item {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.85rem;
-    }
-    .hit-item:last-child { border-bottom: none; }
-    .hit-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 16px;
-      margin-bottom: 6px;
-      color: var(--muted);
+      background: var(--surface-solid);
       font-size: 0.78rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background 0.15s;
     }
-    .hit-meta strong { color: var(--text); }
-    .hit-preview { color: var(--text); line-height: 1.5; }
-    .input-area {
-      display: flex;
-      gap: 10px;
-      align-items: flex-end;
-    }
-    textarea {
-      flex: 1;
-      min-height: 80px;
-      max-height: 160px;
-      padding: 12px 14px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      resize: vertical;
-      outline: none;
-    }
-    textarea:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-    }
-    .loading {
-      display: inline-block;
+
+    .sources-toggle:hover { background: var(--accent-soft); }
+
+    .sources-toggle svg {
       width: 14px;
       height: 14px;
-      border: 2px solid #cbd5e1;
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
+      transition: transform 0.2s;
     }
+
+    .sources-toggle.collapsed svg { transform: rotate(-90deg); }
+
+    .sources-panel {
+      margin-top: 8px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-solid);
+      overflow: hidden;
+    }
+
+    .sources-panel.hidden { display: none; }
+
+    .source-item {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+
+    .source-item:last-child { border-bottom: none; }
+
+    .source-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .pill {
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .pill-muted {
+      background: #f3f4f6;
+      color: var(--text-secondary);
+    }
+
+    .source-preview {
+      color: var(--text);
+      line-height: 1.55;
+      opacity: 0.85;
+    }
+
+    /* ===== 底部输入 ===== */
+    .input-dock {
+      padding: 12px 0 24px;
+      position: sticky;
+      bottom: 0;
+      background: linear-gradient(to top, var(--bg-bottom) 60%, transparent);
+    }
+
+    .input-box {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: var(--surface-solid);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 12px 12px 16px;
+      box-shadow: var(--shadow-input);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-box:focus-within {
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15);
+    }
+
+    .input-box textarea {
+      flex: 1;
+      border: none;
+      outline: none;
+      resize: none;
+      font: inherit;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      background: transparent;
+      min-height: 24px;
+      max-height: 140px;
+      color: var(--text);
+    }
+
+    .input-box textarea::placeholder { color: #a0aec0; }
+
+    .send-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 10px;
+      background: #d1d5db;
+      color: #fff;
+      cursor: not-allowed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s, transform 0.12s;
+    }
+
+    .send-btn.ready {
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    .send-btn.ready:hover { background: #4f46e5; }
+    .send-btn.ready:active { transform: scale(0.94); }
+
+    .send-btn.loading {
+      background: var(--accent);
+      cursor: wait;
+    }
+
+    .send-btn svg { width: 18px; height: 18px; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .input-hint {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      margin-top: 8px;
+      min-height: 18px;
+    }
+
+    .input-hint.error { color: #dc2626; }
+
+    .footer-note {
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      opacity: 0.7;
+      padding-bottom: 8px;
+    }
+
+    @media (max-width: 600px) {
+      .brand-text p { display: none; }
+      .mode-select { max-width: 130px; font-size: 0.75rem; }
+      .sources { margin-left: 0; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>RAG 知识库问答</h1>
-      <p>先展示检索到的相关向量，再生成严谨回答</p>
-    </header>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">监</div>
+      <div class="brand-text">
+        <h1>监管知识应知应会</h1>
+        <p>基于向量检索的合规知识问答</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <select class="mode-select" id="mode" title="知识库模式"></select>
+      <button class="btn-text" id="clearBtn" type="button">清空对话</button>
+    </div>
+  </header>
 
-    <div class="toolbar">
-      <label for="mode">知识库模式</label>
-      <select id="mode"></select>
-      <button class="btn btn-ghost" id="clearBtn">清空对话</button>
-      <span class="status" id="status"></span>
+  <main class="main">
+    <div class="chat-scroll" id="chatScroll">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="currentColor"/>
+          </svg>
+        </div>
+        <h2>监管知识应知应会</h2>
+        <p>输入监管相关问题，系统将先检索知识库中的相关文档片段，再为您生成严谨、准确的回答。</p>
+      </div>
+      <div id="chatArea"></div>
     </div>
 
-    <div class="chat-box" id="chatBox">
-      <div class="empty-tip" id="emptyTip">选择模式后，在下方输入问题开始对话</div>
+    <div class="input-dock">
+      <div class="input-box">
+        <textarea
+          id="queryInput"
+          placeholder="输入您的问题…"
+          rows="1"
+          maxlength="32000"
+        ></textarea>
+        <button class="send-btn" id="sendBtn" type="button" disabled aria-label="发送">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(-90 12 12)"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint" id="statusHint"></div>
     </div>
+  </main>
 
-    <div class="input-area">
-      <textarea id="queryInput" placeholder="请输入您的问题…" rows="3"></textarea>
-      <button class="btn btn-primary" id="sendBtn">发送</button>
-    </div>
-  </div>
+  <div class="footer-note">回答严格依据知识库文档 · 仅供参考，请以正式文件为准</div>
 
   <script>
     const modeSelect = document.getElementById("mode");
-    const chatBox = document.getElementById("chatBox");
-    const emptyTip = document.getElementById("emptyTip");
+    const chatArea = document.getElementById("chatArea");
+    const chatScroll = document.getElementById("chatScroll");
+    const emptyState = document.getElementById("emptyState");
     const queryInput = document.getElementById("queryInput");
     const sendBtn = document.getElementById("sendBtn");
     const clearBtn = document.getElementById("clearBtn");
-    const statusEl = document.getElementById("status");
+    const statusHint = document.getElementById("statusHint");
 
     let loading = false;
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function autoResize() {
+      queryInput.style.height = "auto";
+      queryInput.style.height = Math.min(queryInput.scrollHeight, 140) + "px";
+    }
+
+    function updateSendBtn() {
+      const ready = queryInput.value.trim().length > 0 && !loading && !modeSelect.selectedOptions[0]?.disabled;
+      sendBtn.classList.toggle("ready", ready);
+      sendBtn.disabled = !ready;
+    }
 
     async function loadModes() {
       const res = await fetch("/api/modes");
@@ -227,9 +525,8 @@
       data.modes.forEach((m) => {
         const opt = document.createElement("option");
         opt.value = m.id;
-        const count = m.vector_count != null ? ` · ${m.vector_count} 向量` : "";
-        const ready = m.ready ? "" : "（未构建）";
-        opt.textContent = `${m.label}${count}${ready}`;
+        const count = m.vector_count != null ? ` · ${m.vector_count}条` : "";
+        opt.textContent = m.ready ? m.label + count : `${m.label}（未就绪）`;
         opt.disabled = !m.ready;
         modeSelect.appendChild(opt);
       });
@@ -239,64 +536,89 @@
     function updateStatus() {
       const opt = modeSelect.selectedOptions[0];
       if (!opt || opt.disabled) {
-        statusEl.textContent = "当前模式索引未就绪，请先构建向量库";
-        statusEl.className = "status error";
-        sendBtn.disabled = true;
+        statusHint.textContent = "知识库索引未就绪，请先构建向量库";
+        statusHint.className = "input-hint error";
       } else {
-        statusEl.textContent = `当前: ${opt.textContent}`;
-        statusEl.className = "status";
-        sendBtn.disabled = loading;
+        statusHint.textContent = "";
+        statusHint.className = "input-hint";
       }
+      updateSendBtn();
     }
 
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    function renderHits(hits, modeLabel) {
-      if (!hits || hits.length === 0) {
-        return `<div class="hits-block"><div class="hits-header">检索结果 · ${escapeHtml(modeLabel)} · 未命中相关向量</div></div>`;
-      }
-      const items = hits.map((h) => `
-        <div class="hit-item">
-          <div class="hit-meta">
-            <span><strong>#${h.rank}</strong></span>
-            <span>向量ID=${h.vector_id}</span>
-            <span>相似度=${h.score}</span>
-            <span>${escapeHtml(h.display_name || "")}</span>
-            ${h.location && h.location !== "—" ? `<span>${escapeHtml(h.location)}</span>` : ""}
+    function renderSources(hits, modeLabel, turnId) {
+      const count = hits?.length || 0;
+      const label = count ? `${count} 条相关文档片段` : "未检索到相关片段";
+      const items = (hits || []).map((h) => `
+        <div class="source-item">
+          <div class="source-meta">
+            <span class="pill">相似度 ${h.score}</span>
+            <span class="pill pill-muted">#${h.vector_id}</span>
+            ${h.location && h.location !== "—" ? `<span class="pill pill-muted">${escapeHtml(h.location)}</span>` : ""}
           </div>
-          ${h.summary ? `<div class="hit-meta" style="margin-bottom:4px">摘要: ${escapeHtml(h.summary)}</div>` : ""}
-          <div class="hit-preview">${escapeHtml(h.preview || "")}</div>
+          <div class="source-preview">${escapeHtml(h.preview || "")}</div>
         </div>
       `).join("");
-      return `<div class="hits-block"><div class="hits-header">检索结果 · ${escapeHtml(modeLabel)} · 共 ${hits.length} 条</div>${items}</div>`;
+
+      return `
+        <div class="sources">
+          <div class="sources-toggle" data-panel="panel-${turnId}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+            <span>${escapeHtml(label)} · ${escapeHtml(modeLabel)}</span>
+          </div>
+          <div class="sources-panel" id="panel-${turnId}">
+            ${items || '<div class="source-item" style="color:var(--text-secondary)">暂无匹配内容</div>'}
+          </div>
+        </div>
+      `;
     }
 
     function appendTurn(query, hits, answer, modeLabel) {
-      emptyTip.style.display = "none";
-      const wrap = document.createElement("div");
-      wrap.className = "message";
-      wrap.innerHTML = `
-        <div class="message-label">您</div>
-        <div class="bubble bubble-user">${escapeHtml(query)}</div>
-        ${renderHits(hits, modeLabel)}
-        <div class="message-label">助手</div>
-        <div class="bubble bubble-assistant">${escapeHtml(answer)}</div>
+      emptyState.classList.add("hidden");
+
+      const turnId = Date.now();
+      const turn = document.createElement("div");
+      turn.className = "turn";
+      turn.innerHTML = `
+        <div class="msg-row">
+          <div class="avatar avatar-user">您</div>
+          <div class="msg-body">
+            <div class="msg-label">提问</div>
+            <div class="msg-user-text">${escapeHtml(query)}</div>
+          </div>
+        </div>
+        ${renderSources(hits, modeLabel, turnId)}
+        <div class="msg-row">
+          <div class="avatar avatar-ai">答</div>
+          <div class="msg-body">
+            <div class="msg-label">回答</div>
+            <div class="msg-ai-text">${escapeHtml(answer)}</div>
+          </div>
+        </div>
       `;
-      chatBox.appendChild(wrap);
-      chatBox.scrollTop = chatBox.scrollHeight;
+      chatArea.appendChild(turn);
+
+      const toggle = turn.querySelector(".sources-toggle");
+      toggle.addEventListener("click", () => {
+        toggle.classList.toggle("collapsed");
+        document.getElementById(`panel-${turnId}`).classList.toggle("hidden");
+      });
+
+      chatScroll.scrollTop = chatScroll.scrollHeight;
     }
 
     async function sendQuery() {
       const query = queryInput.value.trim();
-      if (!query || loading) return;
+      if (!query || loading || modeSelect.selectedOptions[0]?.disabled) return;
 
       loading = true;
+      sendBtn.classList.remove("ready");
+      sendBtn.classList.add("loading");
+      sendBtn.innerHTML = '<div class="spinner"></div>';
       sendBtn.disabled = true;
-      sendBtn.innerHTML = '<span class="loading"></span>思考中';
+      statusHint.textContent = "正在检索知识库并生成回答…";
+      statusHint.className = "input-hint";
 
       try {
         const res = await fetch("/api/chat", {
@@ -308,12 +630,16 @@
         if (!res.ok) throw new Error(data.error || "请求失败");
         appendTurn(data.query, data.hits, data.answer, data.mode_label);
         queryInput.value = "";
+        autoResize();
+        statusHint.textContent = "";
       } catch (err) {
-        alert(err.message || "出错了");
+        statusHint.textContent = err.message || "出错了，请稍后重试";
+        statusHint.className = "input-hint error";
       } finally {
         loading = false;
-        sendBtn.textContent = "发送";
-        updateStatus();
+        sendBtn.classList.remove("loading");
+        sendBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(-90 12 12)"/></svg>';
+        updateSendBtn();
       }
     }
 
@@ -323,12 +649,14 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: modeSelect.value }),
       });
-      chatBox.innerHTML = "";
-      chatBox.appendChild(emptyTip);
-      emptyTip.style.display = "block";
+      chatArea.innerHTML = "";
+      emptyState.classList.remove("hidden");
+      statusHint.textContent = "";
+      statusHint.className = "input-hint";
     });
 
     sendBtn.addEventListener("click", sendQuery);
+    queryInput.addEventListener("input", () => { autoResize(); updateSendBtn(); });
     queryInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -338,6 +666,7 @@
     modeSelect.addEventListener("change", updateStatus);
 
     loadModes();
+    autoResize();
   </script>
 </body>
 </html>

@@ -1,0 +1,25 @@
+{
+  "source_file": "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/X-2024ƒÍ12‘¬πÿ”⁄π´Àæ÷Œ¿Ìº‡π‹πÊ∂®”Îπ´Àæ∑®œŒΩ””–πÿ ¬œÓµƒÕ®÷™.pdf",
+  "preprocess_mode": "llm",
+  "chat_model": "deepseek-v4-pro",
+  "total_pages": 1,
+  "valid_pages": 0,
+  "empty_pages": [
+    1
+  ],
+  "error_pages": [],
+  "batch_count": 0,
+  "min_chunk_chars": 200,
+  "max_chunk_chars": 1200,
+  "chunk_count": 0,
+  "created_at": "2026-06-25T17:38:16",
+  "pages": [
+    {
+      "page_number": 1,
+      "text": "",
+      "is_empty": true,
+      "error": null
+    }
+  ],
+  "chunks": []
+}

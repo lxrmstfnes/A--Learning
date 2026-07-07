@@ -1,0 +1,8 @@
+dashscope==1.22.1
+langchain==1.0.3
+langchain_community==0.4.1
+langchain_core==1.0.3
+langgraph==1.0.2
+matplotlib==3.10.7
+qwen_agent==0.0.25
+~wen_agent==0.0.19
