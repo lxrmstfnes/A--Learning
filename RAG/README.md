@@ -31,12 +31,13 @@
 | 环节 | 工具 / 模型 | 说明 |
 |------|-------------|------|
 | PDF 阅读 | [pypdf](https://pypi.org/project/pypdf/) | 逐页提取文本，记录页码 |
+| Word 阅读 | [python-docx](https://pypi.org/project/python-docx/) + textutil/LibreOffice | `.docx` 直接解析；`.doc` 优先系统工具转文本 |
 | 文本嵌入 | `text-embedding-v4` | 百炼 Qwen3-Embedding，1024 维 |
 | 对话生成 | `deepseek-v4-pro` | 百炼 DeepSeek，严谨自然回答 |
 | 向量检索 | FAISS (`faiss-cpu`) | IndexFlatIP + L2 归一化，余弦相似度 |
 | Web 界面 | Flask | 项目根目录 `web_app.py` |
 
-> 当前预处理**仅支持 PDF**。`.doc` / `.docx` 需先转为 PDF 再放入 `data/`。
+> 支持 `.pdf` / `.docx` / `.doc`。Word 无真实页码时按约 1800 字切成伪页，供后续分批与引用。
 
 ---
 
@@ -81,7 +82,7 @@ A--Learning/
 ## 整体流程
 
 ```
-data/*.pdf
+data/*.{pdf,docx,doc}
     │
     ├─【方案 A】Normal/GetKnowledge.py
     │     PreProcessed.py  →  processed/*.preprocessed.json
@@ -142,6 +143,7 @@ openai>=1.0.0
 faiss-cpu>=1.7.4
 numpy>=1.24.0
 pypdf>=4.0.0
+python-docx>=1.1.0
 ```
 
 ### 配置 API Key
@@ -160,7 +162,7 @@ export DASHSCOPE_API_KEY="your-dashscope-api-key"
 
 ### 1. 放入文档
 
-将 PDF 文件放入 `RAG/data/`。
+将 `.pdf` / `.docx` / `.doc` 文件放入 `RAG/data/`（或其子目录）。
 
 ### 2. 构建向量库
 
@@ -338,7 +340,7 @@ python GetKnowledgeLLM.py --rebuild       # 方案 B
 
 ### Q: Word 文档怎么处理？
 
-当前仅支持 PDF。请先将 `.doc` / `.docx` 转为 PDF 放入 `data/`。
+已支持 `.docx`（python-docx）与 `.doc`（macOS `textutil` 或 LibreOffice `soffice`）。将文件直接放入 `data/` 后按原流程构建即可。若 `.doc` 解析失败，请安装 LibreOffice，或另存为 `.docx` / `.pdf`。
 
 ### Q: 报「未找到 API Key」
 

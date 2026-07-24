@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PDF 文档预处理 — 方案 B：LLM 语义切分 (PreprocessLLM)
-======================================================
+文档预处理 — 方案 B：LLM 语义切分 (PreprocessLLM)
+==================================================
 
 标准大模型预处理流程:
-    1. pypdf 逐页提取 PDF 文本，记录页码，处理空白/异常页
+    1. 提取 PDF / Word 文本，记录页码（Word 为伪页），处理空白/异常页
     2. 按上下文窗口将页面分批（批次间 1 页重叠，避免边界断句）
     3. 调用 deepseek-v4-pro，按语义完整性切分并返回结构化 JSON
     4. 校验 LLM 标注的页码（文本重合推断），修正错误映射
@@ -13,6 +13,7 @@ PDF 文档预处理 — 方案 B：LLM 语义切分 (PreprocessLLM)
 用法:
     python PreprocessLLM.py
     python PreprocessLLM.py --input data/某文件.pdf
+    python PreprocessLLM.py --input data/某文件.docx
     python PreprocessLLM.py --dry-run          # 仅展示分批计划，不调用 API
 
 API Key:
@@ -39,8 +40,8 @@ sys.path.insert(0, str(RAG_ROOT / "Normal"))
 
 from PreProcessed import (
     PageRecord,
-    extract_pages_from_pdf,
-    iter_pdf_files,
+    extract_pages_from_document,
+    iter_document_files,
 )
 
 
@@ -446,8 +447,8 @@ def preprocess_pdf_llm(
     max_chunk_chars: int = MAX_CHUNK_CHARS,
     page_overlap: int = BATCH_PAGE_OVERLAP,
 ) -> PreprocessLLMResult:
-    """执行 LLM 预处理完整流程。"""
-    pages, total_pages = extract_pages_from_pdf(pdf_path)
+    """执行 LLM 预处理完整流程（支持 PDF / Word）。"""
+    pages, total_pages = extract_pages_from_document(pdf_path)
 
     empty_pages = [page.page_number for page in pages if page.is_empty]
     error_pages = [page.page_number for page in pages if page.error]
@@ -539,7 +540,7 @@ def default_output_file(pdf_path: Path, output_dir: Path) -> Path:
 
 def print_batch_plan(pdf_path: Path, max_batch_chars: int, page_overlap: int) -> None:
     """dry-run：仅展示分批计划。"""
-    pages, total_pages = extract_pages_from_pdf(pdf_path)
+    pages, total_pages = extract_pages_from_document(pdf_path)
     valid_pages = [page for page in pages if not page.is_empty and not page.error]
     batches = group_pages_into_batches(valid_pages, max_batch_chars, page_overlap)
 
@@ -583,13 +584,13 @@ def print_summary(result: PreprocessLLMResult, output_path: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="PDF 文档预处理方案 B — pypdf 逐页提取 + deepseek-v4-pro 语义切分"
+        description="文档预处理方案 B — PDF/Word 提取 + deepseek-v4-pro 语义切分"
     )
     parser.add_argument(
         "--input",
         type=str,
         default=str(DEFAULT_INPUT_DIR),
-        help=f"PDF 文件或目录（默认: {DEFAULT_INPUT_DIR}）",
+        help=f"PDF/Word 文件或目录（默认: {DEFAULT_INPUT_DIR}）",
     )
     parser.add_argument(
         "--output",
@@ -611,13 +612,13 @@ def main() -> None:
     output_dir = Path(args.output).expanduser().resolve()
 
     try:
-        pdf_files = iter_pdf_files(input_path)
+        doc_files = list(iter_document_files(input_path))
     except (FileNotFoundError, ValueError) as exc:
         print(f"[错误] {exc}", file=sys.stderr)
         sys.exit(1)
 
     print("=" * 60)
-    print("  PDF 文档预处理 — 方案 B (PreprocessLLM)")
+    print("  文档预处理 — 方案 B (PreprocessLLM) PDF / Word")
     print("=" * 60)
     print(f"  输入: {input_path}")
     print(f"  输出目录: {output_dir}")
@@ -629,8 +630,8 @@ def main() -> None:
     print("=" * 60)
 
     if args.dry_run:
-        for pdf_path in pdf_files:
-            print_batch_plan(pdf_path, args.max_batch_chars, args.batch_overlap)
+        for doc_path in doc_files:
+            print_batch_plan(doc_path, args.max_batch_chars, args.batch_overlap)
         print("\n[完成] dry-run 结束。")
         return
 
@@ -641,22 +642,22 @@ def main() -> None:
         print(f"[错误] {exc}", file=sys.stderr)
         sys.exit(1)
 
-    for pdf_path in pdf_files:
+    for doc_path in doc_files:
         try:
-            print(f"\n[处理] {pdf_path.name}")
+            print(f"\n[处理] {doc_path.name}")
             result = preprocess_pdf_llm(
-                pdf_path=pdf_path,
+                pdf_path=doc_path,
                 client=client,
                 max_batch_chars=args.max_batch_chars,
                 min_chunk_chars=args.min_chunk_chars,
                 max_chunk_chars=args.max_chunk_chars,
                 page_overlap=args.batch_overlap,
             )
-            output_path = default_output_file(pdf_path, output_dir)
+            output_path = default_output_file(doc_path, output_dir)
             save_llm_result(result, output_path)
             print_summary(result, output_path)
         except Exception as exc:  # noqa: BLE001
-            print(f"[错误] 处理失败 {pdf_path.name}: {exc}", file=sys.stderr)
+            print(f"[错误] 处理失败 {doc_path.name}: {exc}", file=sys.stderr)
 
     print("\n[完成] LLM 预处理结束。")
 

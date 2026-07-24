@@ -4,9 +4,10 @@
 RAG 知识库问答入口 (main)
 =========================
 
-在 RAG 根目录运行，支持选择两种知识库模式进行问答:
-    - normal: 普通方法（规则切分）→ faiss_index/
-    - llm:    LLM 方法（语义切分）  → faiss_index/llm/
+在 RAG 根目录运行，支持选择知识库模式进行问答:
+    - normal:      普通方法（规则切分）→ faiss_index/
+    - llm:         LLM 方法（原知识库）→ faiss_index/llm/
+    - competition: LLM 方法（competition）→ faiss_index/llm/competition/
 
 每次回答前会先调用轻量模型改写 Query，再检索向量库，最后调用 deepseek-v4-pro 生成回答。
 
@@ -67,8 +68,12 @@ MODE_CONFIG = {
         "index_dir": DEFAULT_INDEX_DIR,
     },
     "llm": {
-        "label": "LLM 方法（语义切分）",
+        "label": "LLM 方法（原知识库）",
         "index_dir": DEFAULT_LLM_INDEX_DIR,
+    },
+    "competition": {
+        "label": "LLM 方法（competition）",
+        "index_dir": DEFAULT_LLM_INDEX_DIR / "competition",
     },
 }
 
@@ -982,15 +987,23 @@ def run_rag_turn(
 def choose_mode_interactive() -> str:
     """交互式选择 RAG 模式。"""
     print("\n请选择 RAG 模式:")
-    print("  1. 普通方法（规则切分）  → faiss_index/")
-    print("  2. LLM 方法（语义切分）  → faiss_index/llm/")
+    print("  1. 普通方法（规则切分）       → faiss_index/")
+    print("  2. LLM 方法（原知识库）       → faiss_index/llm/")
+    print("  3. LLM 方法（competition）    → faiss_index/llm/competition/")
     print("  q. 退出")
 
-    mapping = {"1": "normal", "2": "llm", "normal": "normal", "llm": "llm"}
+    mapping = {
+        "1": "normal",
+        "2": "llm",
+        "3": "competition",
+        "normal": "normal",
+        "llm": "llm",
+        "competition": "competition",
+    }
 
     while True:
         try:
-            choice = input("\n请输入选项 [1/2]: ").strip().lower()
+            choice = input("\n请输入选项 [1/2/3]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print("\n再见！")
             sys.exit(0)
@@ -1000,7 +1013,7 @@ def choose_mode_interactive() -> str:
             sys.exit(0)
         if choice in mapping:
             return mapping[choice]
-        print("无效选项，请输入 1 或 2。")
+        print("无效选项，请输入 1、2 或 3。")
 
 
 def print_welcome(mode: str, config: dict) -> None:
@@ -1065,13 +1078,13 @@ def run_interactive(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="RAG 知识库问答 — 支持普通 / LLM 两种模式")
+    parser = argparse.ArgumentParser(description="RAG 知识库问答 — 支持普通 / LLM / competition")
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["normal", "llm"],
+        choices=["normal", "llm", "competition"],
         default="",
-        help="知识库模式: normal=规则切分, llm=语义切分（省略则交互选择）",
+        help="知识库模式: normal / llm / competition（省略则交互选择）",
     )
     parser.add_argument("--query", type=str, default="", help="单次提问（省略则进入交互模式）")
     parser.add_argument("--top-k", type=int, default=RETRIEVE_TOP_K, help="检索返回条数")

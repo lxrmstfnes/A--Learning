@@ -1,0 +1,17 @@
+{
+  "embedding_model": "text-embedding-v4",
+  "embedding_dim": 1024,
+  "preprocess_mode": "llm",
+  "preprocess_suffix": ".preprocessed.llm.json",
+  "index_type": "IndexFlatIP",
+  "similarity": "cosine",
+  "vector_count": 50,
+  "document_count": 4,
+  "source_files": [
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/ competition/IT-0000000053变更管理规范.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/ competition/IT-0000000054变更管理工作手册.doc",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/ competition/IT-0000000317 基础软件升级规范（2026版）-5.12.pdf",
+    "/Users/eliotlee/Desktop/demo/A--Learning/RAG/data/ competition/川信联发〔2022〕4号- 四川省农村信用社联合社数据中心机房管理办法（2021年版）.pdf"
+  ],
+  "created_at": "2026-07-24T10:16:16"
+}

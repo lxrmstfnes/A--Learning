@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PDF 文档预处理 (PreProcessed)
-=============================
+文档预处理 (PreProcessed)
+=========================
 
 预处理流程:
-    1. 逐页提取 PDF 文本，记录页码，处理空白/异常页
+    1. 提取 PDF / Word（.pdf / .docx / .doc）文本，记录页码（Word 为伪页）
     2. 清洗与规范化提取文本
     3. 递归字符分割（chunk_size=1000, overlap=200）
     4. 基于字符偏移，建立文本块与来源页码的映射
@@ -13,6 +13,7 @@ PDF 文档预处理 (PreProcessed)
 用法:
     python PreProcessed.py
     python PreProcessed.py --input data/某文件.pdf
+    python PreProcessed.py --input data/某文件.docx
     python PreProcessed.py --input data/ --output processed/
 """
 
@@ -21,7 +22,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +45,12 @@ DEFAULT_OUTPUT_DIR = RAG_ROOT / "processed"
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 PAGE_SEPARATOR = "\n\n"
+
+# 支持的文档扩展名
+SUPPORTED_DOC_EXTENSIONS = {".pdf", ".doc", ".docx"}
+
+# Word 无真实页码时，按约该字符数切成伪页，便于后续分批
+WORD_PSEUDO_PAGE_CHARS = 1800
 
 # 递归分割优先级：段落 -> 行 -> 中文句读 -> 英文句点 -> 空格 -> 字符
 DEFAULT_SEPARATORS = ["\n\n", "\n", "。", "！", "？", "；", ". ", " ", ""]
@@ -83,7 +93,7 @@ class TextChunk:
 
 @dataclass
 class PreprocessResult:
-    """单份 PDF 的完整预处理结果。"""
+    """单份文档的完整预处理结果。"""
 
     source_file: str
     total_pages: int
@@ -99,7 +109,7 @@ class PreprocessResult:
 
 
 # =============================================================================
-# 1. 逐页 PDF 提取
+# 1. 文档文本提取（PDF / Word）
 # =============================================================================
 
 
@@ -150,6 +160,213 @@ def extract_pages_from_pdf(pdf_path: Path) -> Tuple[List[PageRecord], int]:
             )
 
     return records, total_pages
+
+
+def _paragraphs_from_docx(doc_path: Path) -> List[str]:
+    """用 python-docx 提取段落与表格文本。"""
+    try:
+        from docx import Document
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "处理 .docx 需要安装 python-docx，请执行: pip install python-docx"
+        ) from exc
+
+    document = Document(str(doc_path))
+    parts: List[str] = []
+
+    for paragraph in document.paragraphs:
+        text = paragraph.text.strip()
+        if text:
+            parts.append(text)
+
+    for table in document.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                parts.append("\t".join(cells))
+
+    return parts
+
+
+def _run_command(command: Sequence[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    """运行外部命令，捕获 stdout/stderr。"""
+    return subprocess.run(
+        list(command),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def _extract_doc_via_textutil(doc_path: Path) -> Optional[str]:
+    """macOS textutil：.doc → txt。"""
+    if not shutil.which("textutil"):
+        return None
+
+    with tempfile.TemporaryDirectory(prefix="rag_doc_") as tmp_dir:
+        out_path = Path(tmp_dir) / f"{doc_path.stem}.txt"
+        result = _run_command(
+            ["textutil", "-convert", "txt", str(doc_path), "-output", str(out_path)]
+        )
+        if result.returncode != 0 or not out_path.exists():
+            return None
+        return out_path.read_text(encoding="utf-8", errors="ignore")
+
+
+def _extract_doc_via_libreoffice(doc_path: Path) -> Optional[str]:
+    """LibreOffice / soffice：.doc → txt。"""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        return None
+
+    with tempfile.TemporaryDirectory(prefix="rag_doc_") as tmp_dir:
+        result = _run_command(
+            [
+                soffice,
+                "--headless",
+                "--norestore",
+                "--convert-to",
+                "txt:Text",
+                "--outdir",
+                tmp_dir,
+                str(doc_path),
+            ],
+            timeout=180,
+        )
+        if result.returncode != 0:
+            return None
+
+        candidates = list(Path(tmp_dir).glob("*.txt"))
+        if not candidates:
+            return None
+        return candidates[0].read_text(encoding="utf-8", errors="ignore")
+
+
+def extract_docx_text(doc_path: Path) -> str:
+    """提取 .docx 全文。"""
+    return "\n\n".join(_paragraphs_from_docx(doc_path))
+
+
+def extract_doc_text(doc_path: Path) -> str:
+    """
+    提取旧版 .doc 全文。
+
+    优先顺序: macOS textutil → LibreOffice → 尝试按 docx 打开。
+    """
+    text = _extract_doc_via_textutil(doc_path)
+    if text and text.strip():
+        return text
+
+    text = _extract_doc_via_libreoffice(doc_path)
+    if text and text.strip():
+        return text
+
+    # 少数文件扩展名为 .doc 实为 OOXML
+    try:
+        text = extract_docx_text(doc_path)
+        if text.strip():
+            return text
+    except Exception:  # noqa: BLE001
+        pass
+
+    raise RuntimeError(
+        f"无法解析 .doc 文件: {doc_path.name}。"
+        "请安装 LibreOffice（soffice），或在 macOS 上确保可用 textutil；"
+        "也可先将该文件另存为 .docx / .pdf 后再入库。"
+    )
+
+
+def extract_word_text(word_path: Path) -> str:
+    """按扩展名提取 Word 全文。"""
+    suffix = word_path.suffix.lower()
+    if suffix == ".docx":
+        return extract_docx_text(word_path)
+    if suffix == ".doc":
+        return extract_doc_text(word_path)
+    raise ValueError(f"不支持的 Word 扩展名: {word_path}")
+
+
+def split_text_into_pseudo_pages(
+    text: str,
+    max_chars: int = WORD_PSEUDO_PAGE_CHARS,
+) -> List[PageRecord]:
+    """
+    将无页码文档按段落切成伪页，便于沿用「按页分批」逻辑。
+
+    优先在段落边界断开；单段超长时再硬切。
+    """
+    text = normalize_page_text(text)
+    if not text:
+        return [PageRecord(page_number=1, text="", is_empty=True)]
+
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    if not paragraphs:
+        paragraphs = [text]
+
+    pages: List[PageRecord] = []
+    buffer = ""
+
+    def flush() -> None:
+        nonlocal buffer
+        content = normalize_page_text(buffer)
+        if not content:
+            buffer = ""
+            return
+        pages.append(
+            PageRecord(
+                page_number=len(pages) + 1,
+                text=content,
+                is_empty=False,
+            )
+        )
+        buffer = ""
+
+    for paragraph in paragraphs:
+        candidate = f"{buffer}\n\n{paragraph}".strip() if buffer else paragraph
+        if buffer and len(candidate) > max_chars:
+            flush()
+            candidate = paragraph
+
+        if len(candidate) <= max_chars:
+            buffer = candidate
+            continue
+
+        # 单段过长：按 max_chars 硬切
+        flush()
+        start = 0
+        while start < len(paragraph):
+            piece = paragraph[start : start + max_chars]
+            pages.append(
+                PageRecord(
+                    page_number=len(pages) + 1,
+                    text=piece,
+                    is_empty=False,
+                )
+            )
+            start += max_chars
+
+    flush()
+    return pages or [PageRecord(page_number=1, text="", is_empty=True)]
+
+
+def extract_pages_from_word(word_path: Path) -> Tuple[List[PageRecord], int]:
+    """提取 Word 文本并切成伪页。"""
+    raw = extract_word_text(word_path)
+    pages = split_text_into_pseudo_pages(raw)
+    return pages, len(pages)
+
+
+def extract_pages_from_document(doc_path: Path) -> Tuple[List[PageRecord], int]:
+    """按文件类型提取页面记录（PDF 真实页 / Word 伪页）。"""
+    suffix = doc_path.suffix.lower()
+    if suffix == ".pdf":
+        return extract_pages_from_pdf(doc_path)
+    if suffix in {".doc", ".docx"}:
+        return extract_pages_from_word(doc_path)
+    raise ValueError(
+        f"不支持的文件类型: {doc_path.name}（支持: {', '.join(sorted(SUPPORTED_DOC_EXTENSIONS))}）"
+    )
 
 
 # =============================================================================
@@ -375,13 +592,13 @@ def split_and_map_pages(
 # =============================================================================
 
 
-def preprocess_pdf(
-    pdf_path: Path,
+def preprocess_document(
+    doc_path: Path,
     chunk_size: int = CHUNK_SIZE,
     chunk_overlap: int = CHUNK_OVERLAP,
 ) -> PreprocessResult:
-    """执行单份 PDF 的完整预处理流程。"""
-    pages, total_pages = extract_pages_from_pdf(pdf_path)
+    """执行单份文档（PDF / Word）的完整预处理流程。"""
+    pages, total_pages = extract_pages_from_document(doc_path)
     full_text, page_spans, empty_pages, error_pages = build_full_text(pages)
 
     chunks = split_and_map_pages(
@@ -392,7 +609,7 @@ def preprocess_pdf(
     )
 
     return PreprocessResult(
-        source_file=str(pdf_path.resolve()),
+        source_file=str(doc_path.resolve()),
         total_pages=total_pages,
         valid_pages=len(page_spans),
         empty_pages=empty_pages,
@@ -403,6 +620,15 @@ def preprocess_pdf(
         pages=pages,
         chunks=chunks,
     )
+
+
+def preprocess_pdf(
+    pdf_path: Path,
+    chunk_size: int = CHUNK_SIZE,
+    chunk_overlap: int = CHUNK_OVERLAP,
+) -> PreprocessResult:
+    """兼容旧接口：等价于 preprocess_document。"""
+    return preprocess_document(pdf_path, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
 
 def save_preprocess_result(result: PreprocessResult, output_path: Path) -> None:
@@ -426,25 +652,49 @@ def save_preprocess_result(result: PreprocessResult, output_path: Path) -> None:
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def iter_pdf_files(input_path: Path) -> Iterable[Path]:
-    """解析输入路径，返回待处理的 PDF 文件列表。"""
+def _is_supported_document(path: Path) -> bool:
+    """判断是否为可入库文档（排除 Office 临时锁文件）。"""
+    name = path.name
+    if name.startswith("~$") or name.startswith(".~"):
+        return False
+    return path.suffix.lower() in SUPPORTED_DOC_EXTENSIONS
+
+
+def iter_document_files(input_path: Path) -> Iterable[Path]:
+    """解析输入路径，返回待处理的 PDF / Word 文件列表。"""
     if input_path.is_file():
-        if input_path.suffix.lower() != ".pdf":
-            raise ValueError(f"仅支持 PDF 文件: {input_path}")
+        if not _is_supported_document(input_path):
+            raise ValueError(
+                f"仅支持 {', '.join(sorted(SUPPORTED_DOC_EXTENSIONS))} 文件: {input_path}"
+            )
         return [input_path]
 
     if not input_path.exists():
         raise FileNotFoundError(f"输入路径不存在: {input_path}")
 
-    pdfs = sorted(input_path.glob("*.pdf"))
-    if not pdfs:
-        raise FileNotFoundError(f"目录中未找到 PDF 文件: {input_path}")
-    return pdfs
+    files: List[Path] = []
+    for suffix in sorted(SUPPORTED_DOC_EXTENSIONS):
+        files.extend(input_path.glob(f"*{suffix}"))
+    # 去重并按文件名排序（macOS 可能对大小写扩展名各匹配一次）
+    unique = sorted(
+        {path.resolve(): path for path in files if _is_supported_document(path)}.values(),
+        key=lambda p: p.name.lower(),
+    )
+    if not unique:
+        raise FileNotFoundError(
+            f"目录中未找到支持的文档（{', '.join(sorted(SUPPORTED_DOC_EXTENSIONS))}）: {input_path}"
+        )
+    return unique
 
 
-def default_output_file(pdf_path: Path, output_dir: Path) -> Path:
-    """根据 PDF 文件名生成输出 JSON 路径。"""
-    return output_dir / f"{pdf_path.stem}.preprocessed.json"
+def iter_pdf_files(input_path: Path) -> Iterable[Path]:
+    """兼容旧接口：返回 PDF / Word 文档列表。"""
+    return iter_document_files(input_path)
+
+
+def default_output_file(doc_path: Path, output_dir: Path) -> Path:
+    """根据文档文件名生成输出 JSON 路径。"""
+    return output_dir / f"{doc_path.stem}.preprocessed.json"
 
 
 def print_summary(result: PreprocessResult, output_path: Path) -> None:
@@ -473,12 +723,14 @@ def print_summary(result: PreprocessResult, output_path: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="PDF 文档预处理 — pypdf 提取 + 递归字符分割 + 页码映射")
+    parser = argparse.ArgumentParser(
+        description="文档预处理 — PDF/Word 提取 + 递归字符分割 + 页码映射"
+    )
     parser.add_argument(
         "--input",
         type=str,
         default=str(DEFAULT_INPUT_DIR),
-        help=f"PDF 文件或目录（默认: {DEFAULT_INPUT_DIR}）",
+        help=f"PDF/Word 文件或目录（默认: {DEFAULT_INPUT_DIR}）",
     )
     parser.add_argument(
         "--output",
@@ -497,31 +749,32 @@ def main() -> None:
     output_dir = Path(args.output).expanduser().resolve()
 
     try:
-        pdf_files = iter_pdf_files(input_path)
+        doc_files = list(iter_document_files(input_path))
     except (FileNotFoundError, ValueError) as exc:
         print(f"[错误] {exc}", file=sys.stderr)
         sys.exit(1)
 
     print("=" * 60)
-    print("  PDF 文档预处理 (PreProcessed)")
+    print("  文档预处理 (PreProcessed) — PDF / Word")
     print("=" * 60)
     print(f"  输入: {input_path}")
     print(f"  输出目录: {output_dir}")
+    print(f"  支持格式: {', '.join(sorted(SUPPORTED_DOC_EXTENSIONS))}")
     print(f"  分割参数: chunk_size={args.chunk_size}, overlap={args.chunk_overlap}")
     print("=" * 60)
 
-    for pdf_path in pdf_files:
+    for doc_path in doc_files:
         try:
-            result = preprocess_pdf(
-                pdf_path=pdf_path,
+            result = preprocess_document(
+                doc_path=doc_path,
                 chunk_size=args.chunk_size,
                 chunk_overlap=args.chunk_overlap,
             )
-            output_path = default_output_file(pdf_path, output_dir)
+            output_path = default_output_file(doc_path, output_dir)
             save_preprocess_result(result, output_path)
             print_summary(result, output_path)
         except Exception as exc:  # noqa: BLE001
-            print(f"[错误] 处理失败 {pdf_path.name}: {exc}", file=sys.stderr)
+            print(f"[错误] 处理失败 {doc_path.name}: {exc}", file=sys.stderr)
 
     print("\n[完成] 预处理结束。")
 

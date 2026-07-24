@@ -5,7 +5,7 @@
 ============================
 
 汇总 PreProcessed.py + CreateIndex.py，一次运行完成:
-    PDF 预处理 → text-embedding-v4 向量化 → FAISS 索引持久化
+    PDF/Word 预处理 → text-embedding-v4 向量化 → FAISS 索引持久化
 
 用法:
     python GetKnowledge.py
@@ -37,8 +37,8 @@ from PreProcessed import (
     DEFAULT_INPUT_DIR,
     DEFAULT_OUTPUT_DIR,
     default_output_file,
-    iter_pdf_files,
-    preprocess_pdf,
+    iter_document_files,
+    preprocess_document,
     save_preprocess_result,
 )
 
@@ -52,15 +52,15 @@ def run_preprocess_step(
     chunk_size: int,
     chunk_overlap: int,
 ) -> int:
-    """执行 PDF 预处理，返回成功处理的文档数。"""
+    """执行文档预处理，返回成功处理的文档数。"""
     output_dir.mkdir(parents=True, exist_ok=True)
     success_count = 0
 
     for pdf_path in pdf_files:
         try:
             print(f"\n[预处理] {pdf_path.name}")
-            result = preprocess_pdf(
-                pdf_path=pdf_path,
+            result = preprocess_document(
+                doc_path=pdf_path,
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
             )
@@ -96,13 +96,13 @@ def run_index_step(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="知识库一键构建 — PDF 预处理 + FAISS 向量索引"
+        description="知识库一键构建 — PDF/Word 预处理 + FAISS 向量索引"
     )
     parser.add_argument(
         "--input",
         type=str,
         default=str(DEFAULT_INPUT_DIR),
-        help=f"PDF 文件或目录（默认: {DEFAULT_INPUT_DIR}）",
+        help=f"PDF/Word 文件或目录（默认: {DEFAULT_INPUT_DIR}）",
     )
     parser.add_argument(
         "--processed-dir",
@@ -126,12 +126,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skip-preprocess",
         action="store_true",
-        help="跳过 PDF 预处理，仅基于已有 processed/ 构建索引",
+        help="跳过预处理，仅基于已有 processed/ 构建索引",
     )
     parser.add_argument(
         "--preprocess-only",
         action="store_true",
-        help="仅执行 PDF 预处理，不构建索引",
+        help="仅执行预处理，不构建索引",
     )
     return parser.parse_args()
 
@@ -146,7 +146,7 @@ def main() -> None:
     print("=" * 60)
     print("  知识库一键构建 (GetKnowledge)")
     print("=" * 60)
-    print(f"  PDF 输入: {pdf_input}")
+    print(f"  文档输入: {pdf_input}")
     print(f"  预处理输出: {processed_dir}")
     print(f"  索引输出: {index_dir}")
     print(f"  分割参数: chunk_size={args.chunk_size}, overlap={args.chunk_overlap}")
@@ -160,8 +160,8 @@ def main() -> None:
 
     try:
         if not args.skip_preprocess:
-            print("\n>>> 步骤 1/2: PDF 预处理 (PreProcessed)")
-            pdf_files = list(iter_pdf_files(pdf_input))
+            print("\n>>> 步骤 1/2: 文档预处理 (PreProcessed)")
+            pdf_files = list(iter_document_files(pdf_input))
             success = run_preprocess_step(
                 pdf_files=pdf_files,
                 output_dir=processed_dir,
@@ -169,7 +169,7 @@ def main() -> None:
                 chunk_overlap=args.chunk_overlap,
             )
             if success == 0:
-                print("\n[错误] 没有成功预处理的 PDF 文件。", file=sys.stderr)
+                print("\n[错误] 没有成功预处理的文档。", file=sys.stderr)
                 sys.exit(1)
             print(f"\n[步骤 1 完成] 成功预处理 {success}/{len(pdf_files)} 份文档")
         else:

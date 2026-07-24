@@ -5,11 +5,12 @@
 ============================================
 
 汇总 PreprocessLLM.py + CreateIndex.py，一次运行完成:
-    PDF 逐页提取 → deepseek-v4-pro 语义切分 → text-embedding-v4 向量化 → FAISS 索引
+    PDF/Word 文本提取 → deepseek-v4-pro 语义切分 → text-embedding-v4 向量化 → FAISS 索引
 
 用法:
     python GetKnowledgeLLM.py
     python GetKnowledgeLLM.py --input data/ --rebuild
+    python GetKnowledgeLLM.py --input "data/ competition" --rebuild
     python GetKnowledgeLLM.py --skip-preprocess   # 仅重建索引（已有 processed/llm/）
     python GetKnowledgeLLM.py --dry-run           # 仅展示 LLM 分批计划
 
@@ -40,7 +41,7 @@ from PreprocessLLM import (
     MAX_CHUNK_CHARS,
     MIN_CHUNK_CHARS,
     default_output_file,
-    iter_pdf_files,
+    iter_document_files,
     preprocess_pdf_llm,
     print_batch_plan,
     save_llm_result,
@@ -113,7 +114,7 @@ def parse_args() -> argparse.Namespace:
         "--input",
         type=str,
         default=str(DEFAULT_INPUT_DIR),
-        help=f"PDF 文件或目录（默认: {DEFAULT_INPUT_DIR}）",
+        help=f"PDF/Word 文件或目录（默认: {DEFAULT_INPUT_DIR}）",
     )
     parser.add_argument(
         "--processed-dir",
@@ -164,7 +165,7 @@ def main() -> None:
     print("=" * 60)
     print("  知识库一键构建 — LLM 方案 (GetKnowledgeLLM)")
     print("=" * 60)
-    print(f"  PDF 输入: {pdf_input}")
+    print(f"  文档输入: {pdf_input}")
     print(f"  预处理输出: {processed_dir}")
     print(f"  索引输出: {index_dir}")
     print(f"  LLM 分批: max_batch_chars={args.max_batch_chars}, overlap={args.batch_overlap} 页")
@@ -181,9 +182,9 @@ def main() -> None:
 
     try:
         if args.dry_run:
-            pdf_files = list(iter_pdf_files(pdf_input))
-            for pdf_path in pdf_files:
-                print_batch_plan(pdf_path, args.max_batch_chars, args.batch_overlap)
+            doc_files = list(iter_document_files(pdf_input))
+            for doc_path in doc_files:
+                print_batch_plan(doc_path, args.max_batch_chars, args.batch_overlap)
             print("\n[完成] dry-run 结束。")
             return
 
@@ -191,9 +192,9 @@ def main() -> None:
             print("\n>>> 步骤 1/2: LLM 语义预处理 (PreprocessLLM)")
             api_key = load_api_key()
             client = create_client(api_key)
-            pdf_files = list(iter_pdf_files(pdf_input))
+            doc_files = list(iter_document_files(pdf_input))
             success = run_preprocess_step(
-                pdf_files=pdf_files,
+                pdf_files=doc_files,
                 output_dir=processed_dir,
                 client=client,
                 max_batch_chars=args.max_batch_chars,
@@ -202,9 +203,9 @@ def main() -> None:
                 page_overlap=args.batch_overlap,
             )
             if success == 0:
-                print("\n[错误] 没有成功预处理的 PDF 文件。", file=sys.stderr)
+                print("\n[错误] 没有成功预处理的文档。", file=sys.stderr)
                 sys.exit(1)
-            print(f"\n[步骤 1 完成] 成功预处理 {success}/{len(pdf_files)} 份文档")
+            print(f"\n[步骤 1 完成] 成功预处理 {success}/{len(doc_files)} 份文档")
         else:
             print("\n>>> 跳过步骤 1: 使用已有 LLM 预处理结果")
 
