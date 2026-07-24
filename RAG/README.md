@@ -273,6 +273,45 @@ sudo gunicorn -w 2 -b 0.0.0.0:443 web_app:app
 
 安全组需放行对应端口（如 443）。绑定 443 在 Linux/macOS 上通常需要 root（`sudo`），或用 Nginx 反代到高端口。
 
+### 如何保证服务一直运行（推荐）
+
+直接 `python web_app.py` 容易挂：SSH 断开、终端关闭、进程异常退出后都不会自动恢复。请用下面任一方式。
+
+#### 方式 A：一键后台启动（最快，路径自动跟随仓库）
+
+```bash
+cd /root/A--Learning          # 换成你的实际路径即可
+pip install -r requirements-web.txt
+
+# 建议把 Key 写进仓库根目录 .env（换机器也方便）
+cp .env.example .env
+# 编辑 .env 填入真实 Key
+
+chmod +x scripts/start_web.sh
+./scripts/start_web.sh --port 443
+
+# 看日志 / 停止
+tail -f logs/web_app.log
+./scripts/start_web.sh --stop
+```
+
+脚本会自动识别当前仓库目录，并用 `python -m gunicorn`，不依赖固定路径。
+
+#### 方式 B：systemd 开机自启 + 崩溃自动拉起（云服务器推荐）
+
+```bash
+cd /root/A--Learning          # 换成你的实际路径
+cp -n .env.example .env && vi .env   # 填入 DASHSCOPE_API_KEY
+
+chmod +x scripts/install_systemd.sh
+sudo ./scripts/install_systemd.sh --port 443
+
+systemctl status rag-web
+journalctl -u rag-web -f
+```
+
+以后如果把项目挪到别的目录，进入**新目录**再执行一次 `sudo ./scripts/install_systemd.sh` 即可覆盖安装。
+
 ---
 
 ## 脚本速查
