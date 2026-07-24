@@ -1,0 +1,18 @@
+[Unit]
+Description=运维挑战赛 RAG Web 问答服务（模板，请勿直接照抄路径）
+After=network.target
+
+[Service]
+Type=simple
+User=root
+# 下面路径请用 scripts/install_systemd.sh 自动生成，勿手写死目录
+WorkingDirectory=__PROJECT_ROOT__
+EnvironmentFile=-/etc/rag-web.env
+ExecStart=__PYTHON__ -m gunicorn -w 2 -b 0.0.0.0:443 --chdir __PROJECT_ROOT__ --timeout 180 --access-logfile __PROJECT_ROOT__/logs/access.log --error-logfile __PROJECT_ROOT__/logs/web_app.log web_app:app
+Restart=always
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

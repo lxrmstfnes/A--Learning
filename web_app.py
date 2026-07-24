@@ -12,7 +12,9 @@ RAG 知识库 Web 问答界面
     python web_app.py
 
 云服务器部署示例:
-    python web_app.py --host 0.0.0.0 --port 8080
+    python web_app.py --host 0.0.0.0 --port 443
+    # 或直接（默认端口已是 443）:
+    sudo python web_app.py --host 0.0.0.0
 
 前置条件:
     已构建向量库 — Normal/GetKnowledge.py 或 LLM/GetKnowledgeLLM.py
@@ -73,7 +75,14 @@ def index():
 @app.route("/api/modes", methods=["GET"])
 def api_modes():
     modes = []
-    for key, cfg in rag.MODE_CONFIG.items():
+    # 按运维挑战赛优先顺序输出，便于前端默认选中
+    ordered_keys = [k for k in rag.PREFERRED_MODE_ORDER if k in rag.MODE_CONFIG]
+    for key in list(rag.MODE_CONFIG.keys()):
+        if key not in ordered_keys:
+            ordered_keys.append(key)
+
+    for key in ordered_keys:
+        cfg = rag.MODE_CONFIG[key]
         index_dir = cfg["index_dir"]
         ready = (index_dir / "knowledge.index").exists() and (index_dir / "metadata.pkl").exists()
         config = {}
@@ -91,7 +100,12 @@ def api_modes():
                 "created_at": config.get("created_at"),
             }
         )
-    return jsonify({"modes": modes})
+    return jsonify(
+        {
+            "modes": modes,
+            "default_mode": rag.resolve_default_mode(),
+        }
+    )
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -135,7 +149,7 @@ def api_clear():
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="RAG 知识库 Web 问答")
     parser.add_argument("--host", default="127.0.0.1", help="监听地址（云服务器用 0.0.0.0）")
-    parser.add_argument("--port", type=int, default=8080, help="监听端口")
+    parser.add_argument("--port", type=int, default=443, help="监听端口（默认 443）")
     parser.add_argument("--debug", action="store_true", help="调试模式")
     return parser.parse_args()
 
