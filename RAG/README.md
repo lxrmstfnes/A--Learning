@@ -198,7 +198,7 @@ python main.py --mode llm --query "你的问题"
 ```bash
 cd ..   # 项目根目录 A--Learning/
 python web_app.py
-# 浏览器打开 http://127.0.0.1:8080
+# 浏览器打开 http://127.0.0.1:443
 ```
 
 ---
@@ -259,19 +259,19 @@ export DASHSCOPE_API_KEY="your-key"
 # 3. 构建向量库（至少一种）
 cd RAG/Normal && python GetKnowledge.py --rebuild
 
-# 4. 启动 Web（监听外网）
+# 4. 启动 Web（监听外网，默认端口 443）
 cd ../..   # 项目根目录
-python web_app.py --host 0.0.0.0 --port 8080
+sudo python web_app.py --host 0.0.0.0 --port 443
 ```
 
 生产环境推荐 gunicorn：
 
 ```bash
 pip install gunicorn
-gunicorn -w 2 -b 0.0.0.0:8080 web_app:app
+sudo gunicorn -w 2 -b 0.0.0.0:443 web_app:app
 ```
 
-安全组需放行对应端口（如 8080）。
+安全组需放行对应端口（如 443）。绑定 443 在 Linux/macOS 上通常需要 root（`sudo`），或用 Nginx 反代到高端口。
 
 ---
 

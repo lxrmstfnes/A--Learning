@@ -5,16 +5,16 @@ RAG 知识库问答入口 (main)
 =========================
 
 在 RAG 根目录运行，支持选择知识库模式进行问答:
+    - competition: 运维挑战赛知识库 → faiss_index/llm/competition/（默认优先）
+    - llm:         LLM 方法（原监管库）→ faiss_index/llm/
     - normal:      普通方法（规则切分）→ faiss_index/
-    - llm:         LLM 方法（原知识库）→ faiss_index/llm/
-    - competition: LLM 方法（competition）→ faiss_index/llm/competition/
 
-每次回答前会先调用轻量模型改写 Query，再检索向量库，最后调用 deepseek-v4-pro 生成回答。
+策略: 知识库能答就用知识库；检索分低 / 回答显示未覆盖时自动联网补充。
 
 用法:
     python main.py
-    python main.py --mode llm
-    python main.py --mode normal --query "客户经理考核标准是什么？"
+    python main.py --mode competition
+    python main.py --mode llm --query "变更管理审批流程是什么？"
 """
 
 from __future__ import annotations
@@ -52,6 +52,7 @@ from query.query_rewriter import (  # noqa: E402
 )
 from web_search import (  # noqa: E402
     WebSearchHit,
+    build_ops_search_query,
     build_web_context_block,
     search_web,
     serialize_web_hits,
@@ -63,17 +64,17 @@ from web_search import (  # noqa: E402
 # =============================================================================
 
 MODE_CONFIG = {
+    "competition": {
+        "label": "运维挑战赛知识库",
+        "index_dir": DEFAULT_LLM_INDEX_DIR / "competition",
+    },
+    "llm": {
+        "label": "LLM 方法（原监管知识库）",
+        "index_dir": DEFAULT_LLM_INDEX_DIR,
+    },
     "normal": {
         "label": "普通方法（规则切分）",
         "index_dir": DEFAULT_INDEX_DIR,
-    },
-    "llm": {
-        "label": "LLM 方法（原知识库）",
-        "index_dir": DEFAULT_LLM_INDEX_DIR,
-    },
-    "competition": {
-        "label": "LLM 方法（competition）",
-        "index_dir": DEFAULT_LLM_INDEX_DIR / "competition",
     },
 }
 
@@ -91,8 +92,26 @@ MAX_HISTORY_TURNS = 6
 FOLLOW_UP_MAX_LEN = 80
 NEIGHBOR_EXPAND_RADIUS = 1
 MAX_EXPANDED_HITS = 10
-# 本地知识库未覆盖时是否联网补充
+# 本地知识库未覆盖时是否联网补充（运维挑战赛：能库内答就库内，不行再联网）
 WEB_FALLBACK_ENABLED = True
+# 启动时优先选用的模式（索引存在时）
+PREFERRED_MODE_ORDER = ("competition", "llm", "normal")
+
+
+def resolve_default_mode() -> str:
+    """按优先顺序选择已就绪的知识库模式。"""
+    for key in PREFERRED_MODE_ORDER:
+        cfg = MODE_CONFIG.get(key)
+        if not cfg:
+            continue
+        index_dir = cfg["index_dir"]
+        if (index_dir / "knowledge.index").exists() and (index_dir / "metadata.pkl").exists():
+            return key
+    return PREFERRED_MODE_ORDER[0]
+
+
+def is_competition_mode(mode: str) -> bool:
+    return mode == "competition"
 
 
 # =============================================================================
@@ -549,6 +568,23 @@ def build_context_block(hits: Sequence[RetrievedHit]) -> str:
 
 def build_system_prompt(mode: str) -> str:
     mode_label = MODE_CONFIG[mode]["label"]
+    if is_competition_mode(mode):
+        return (
+            f"你是「运维挑战赛」严谨答题助手（当前知识库: {mode_label}）。\n"
+            "目标：尽量用知识库中的制度/规范原文作答，答得准、答得全、便于直接得分。\n"
+            "须遵守：\n"
+            "【准确性 — 最高优先级】\n"
+            "1. 只依据参考片段中明确写出的内容作答；不得编造、推测或补充文档未提及的信息；\n"
+            "2. 步骤、角色、时限、条件、条款编号、文件名称等须与原文一致；\n"
+            "3. 片段足以支撑时，直接给出明确答案；列举型问题尽量列全片段中出现的条目；\n"
+            "4. 片段不足以支撑结论时，明确说「知识库未覆盖/不足以确定」，不要猜测；\n"
+            "5. 若提供同一文档的多段连续片段，应合并理解后完整作答。\n"
+            "【表达】\n"
+            "6. 用简洁书面语，像竞赛标准答；优先分点，避免套话与寒暄；\n"
+            "7. 不要以「根据参考文档」开头，不要在文末罗列来源/页码；\n"
+            "8. 使用简体中文。"
+        )
+
     return (
         f"你是四川农商银行的一位严谨、亲切的知识库问答助手（当前知识库: {mode_label}）。\n"
         "你像一位靠谱的同事：答得准、说得明白，找不到时也愿意帮用户把问题问清楚。\n"
@@ -577,7 +613,18 @@ def build_system_prompt(mode: str) -> str:
     )
 
 
-def build_user_message(query: str, context: str) -> str:
+def build_user_message(query: str, context: str, mode: str = "llm") -> str:
+    if is_competition_mode(mode):
+        return (
+            "以下是运维挑战赛知识库检索到的参考片段（作答主要依据）：\n"
+            "-----\n"
+            f"{context}\n"
+            "-----\n\n"
+            f"赛题/问题：{query}\n\n"
+            "请严格依据片段给出可直接作答的结论；列举题尽量列全。"
+            "若片段未覆盖或证据不足，明确写「知识库未覆盖」，不要编造。"
+        )
+
     return (
         "以下是从知识库检索到的参考片段（这是你作答的主要依据；"
         "用户已看过检索结果，回答时不要重复标注来源）：\n"
@@ -604,11 +651,15 @@ INSUFFICIENT_ANSWER_PATTERNS = (
     "现有片段",
     "文档中未",
     "知识库中未",
+    "知识库未覆盖",
+    "未覆盖",
     "没查到",
     "暂时无法",
     "暂时没",
     "信息不够",
     "还不足以",
+    "材料不足",
+    "超出知识库",
 )
 
 ARTICLE_REF_PATTERN = re.compile(r"第[一二三四五六七八九十百零〇两\d]+条")
@@ -645,6 +696,19 @@ def is_insufficient_local_answer(
 
 def build_web_system_prompt(mode: str) -> str:
     mode_label = MODE_CONFIG[mode]["label"]
+    if is_competition_mode(mode):
+        return (
+            f"你是「运维挑战赛」答题助手（本地知识库: {mode_label} 暂未充分覆盖本题）。\n"
+            "现提供互联网公开检索摘要作为补充依据，请作答。\n"
+            "须遵守：\n"
+            "1. 优先依据检索摘要中可核实的内容，不得编造制度条文或具体条款号；\n"
+            "2. 开头用一句话标明「知识库未命中，以下结合公开资料作答」；\n"
+            "3. 答案尽量简洁、可直接用于竞赛作答；有步骤则分点；\n"
+            "4. 摘要互相矛盾或信息不足时，说明不确定性，并给出最稳妥表述；\n"
+            "5. 结尾可轻提醒：以行内正式制度原文为准；\n"
+            "6. 使用简体中文，不要堆砌链接编号。"
+        )
+
     return (
         f"你是四川农商银行的一位严谨、亲切的知识库问答助手（本地知识库: {mode_label}）。\n"
         "本地知识库暂未覆盖用户所问，以下参考来自互联网公开检索，请结合摘要作答。\n"
@@ -658,8 +722,19 @@ def build_web_system_prompt(mode: str) -> str:
     )
 
 
-def build_web_user_message(query: str, local_context: str, web_context: str) -> str:
+def build_web_user_message(query: str, local_context: str, web_context: str, mode: str = "llm") -> str:
     local_part = local_context if local_context else "（本地未检索到有效片段）"
+    if is_competition_mode(mode):
+        return (
+            "【本地知识库片段】\n"
+            f"{local_part}\n\n"
+            "【互联网检索摘要】\n"
+            f"{web_context}\n\n"
+            f"赛题/问题：{query}\n\n"
+            "知识库不足，请主要依据互联网摘要给出简洁可提交的答案；"
+            "本地片段若无关可忽略。不要编造未出现的条款编号。"
+        )
+
     return (
         "【本地知识库片段】\n"
         f"{local_part}\n\n"
@@ -683,7 +758,10 @@ def generate_web_answer_sync(
     for turn in history[-MAX_HISTORY_TURNS:]:
         messages.append({"role": turn.role, "content": turn.content})
     messages.append(
-        {"role": "user", "content": build_web_user_message(query, local_context, web_context)}
+        {
+            "role": "user",
+            "content": build_web_user_message(query, local_context, web_context, mode),
+        }
     )
 
     response = client.chat.completions.create(
@@ -719,7 +797,9 @@ def maybe_web_fallback(
     if not is_insufficient_local_answer(query, hits, local_answer):
         return local_answer, [], False
 
-    return _answer_from_web(client, query, retrieval_query, hits, mode, history)
+    return _answer_from_web(
+        client, query, retrieval_query, hits, mode, history, local_answer=local_answer
+    )
 
 
 def answer_with_web_if_needed(
@@ -736,13 +816,17 @@ def answer_with_web_if_needed(
         return local_answer or "", [], False
 
     if should_prefetch_web(query, hits):
-        return _answer_from_web(client, query, retrieval_query, hits, mode, history)
+        return _answer_from_web(
+            client, query, retrieval_query, hits, mode, history, local_answer=local_answer
+        )
 
     if local_answer is None:
         return "", [], False
 
     if is_insufficient_local_answer(query, hits, local_answer):
-        return _answer_from_web(client, query, retrieval_query, hits, mode, history)
+        return _answer_from_web(
+            client, query, retrieval_query, hits, mode, history, local_answer=local_answer
+        )
 
     return local_answer, [], False
 
@@ -754,11 +838,16 @@ def _answer_from_web(
     hits: Sequence[RetrievedHit],
     mode: str,
     history: Sequence[ChatTurn],
+    local_answer: Optional[str] = None,
 ) -> Tuple[str, List[WebSearchHit], bool]:
-    search_query = retrieval_query or query
+    base_query = retrieval_query or query
+    search_query = (
+        build_ops_search_query(base_query) if is_competition_mode(mode) else base_query
+    )
     web_hits = search_web(search_query)
     if not web_hits:
-        return "", web_hits, False
+        # 联网失败时尽量退回本地答案，避免空白
+        return local_answer or "", web_hits, False
 
     local_context = build_context_block(hits) if hits else ""
     web_context = build_web_context_block(web_hits)
@@ -799,7 +888,9 @@ def generate_answer_sync(
     messages: List[dict] = [{"role": "system", "content": build_system_prompt(mode)}]
     for turn in history[-MAX_HISTORY_TURNS:]:
         messages.append({"role": turn.role, "content": turn.content})
-    messages.append({"role": "user", "content": build_user_message(query, context)})
+    messages.append(
+        {"role": "user", "content": build_user_message(query, context, mode)}
+    )
 
     response = client.chat.completions.create(
         model=CHAT_MODEL,
@@ -866,6 +957,7 @@ def rag_query(
         "hits": serialize_hits(hits),
         "web_hits": serialize_web_hits(web_hits),
         "used_web_fallback": used_web,
+        "answer_source": "web" if used_web else "knowledge_base",
         "answer": answer,
     }
 
@@ -881,7 +973,9 @@ def generate_answer(
     messages: List[dict] = [{"role": "system", "content": build_system_prompt(mode)}]
     for turn in history[-MAX_HISTORY_TURNS:]:
         messages.append({"role": turn.role, "content": turn.content})
-    messages.append({"role": "user", "content": build_user_message(query, context)})
+    messages.append(
+        {"role": "user", "content": build_user_message(query, context, mode)}
+    )
 
     stream = client.chat.completions.create(
         model=CHAT_MODEL,
@@ -986,24 +1080,27 @@ def run_rag_turn(
 
 def choose_mode_interactive() -> str:
     """交互式选择 RAG 模式。"""
+    default_mode = resolve_default_mode()
     print("\n请选择 RAG 模式:")
-    print("  1. 普通方法（规则切分）       → faiss_index/")
-    print("  2. LLM 方法（原知识库）       → faiss_index/llm/")
-    print("  3. LLM 方法（competition）    → faiss_index/llm/competition/")
+    print("  1. 运维挑战赛知识库         → faiss_index/llm/competition/")
+    print("  2. LLM 方法（原监管知识库） → faiss_index/llm/")
+    print("  3. 普通方法（规则切分）     → faiss_index/")
     print("  q. 退出")
+    print(f"  （直接回车默认: {MODE_CONFIG[default_mode]['label']}）")
 
     mapping = {
-        "1": "normal",
+        "1": "competition",
         "2": "llm",
-        "3": "competition",
-        "normal": "normal",
-        "llm": "llm",
+        "3": "normal",
         "competition": "competition",
+        "llm": "llm",
+        "normal": "normal",
+        "": default_mode,
     }
 
     while True:
         try:
-            choice = input("\n请输入选项 [1/2/3]: ").strip().lower()
+            choice = input("\n请输入选项 [1/2/3，回车默认]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print("\n再见！")
             sys.exit(0)
@@ -1013,7 +1110,7 @@ def choose_mode_interactive() -> str:
             sys.exit(0)
         if choice in mapping:
             return mapping[choice]
-        print("无效选项，请输入 1、2 或 3。")
+        print("无效选项，请输入 1、2、3 或直接回车。")
 
 
 def print_welcome(mode: str, config: dict) -> None:
@@ -1082,9 +1179,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["normal", "llm", "competition"],
+        choices=["competition", "llm", "normal"],
         default="",
-        help="知识库模式: normal / llm / competition（省略则交互选择）",
+        help="知识库模式: competition / llm / normal（省略则交互选择，默认优先 competition）",
     )
     parser.add_argument("--query", type=str, default="", help="单次提问（省略则进入交互模式）")
     parser.add_argument("--top-k", type=int, default=RETRIEVE_TOP_K, help="检索返回条数")

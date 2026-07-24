@@ -332,7 +332,12 @@ def run_interactive(agent: RAGAgent) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="RAG Agent — LangGraph 三步工作流")
-    parser.add_argument("--mode", choices=["normal", "llm"], default="", help="知识库模式")
+    parser.add_argument(
+        "--mode",
+        choices=["competition", "llm", "normal"],
+        default="",
+        help="知识库模式（默认优先 competition）",
+    )
     parser.add_argument("--query", default="", help="单次提问")
     parser.add_argument("--top-k", type=int, default=rag.RETRIEVE_TOP_K, help="检索条数")
     parser.add_argument("--no-web", action="store_true", help="禁用联网补充")
